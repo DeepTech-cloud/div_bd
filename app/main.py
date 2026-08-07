@@ -19,9 +19,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+
+def health_check():
+    return {"status": "health check passed"}
+
 @app.get("/health")
 def health_check():
-    return {"status": "healthy"}
+    return {"status": "Api is running"}
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
