@@ -1,0 +1,32 @@
+# Git & Docker
+.git
+.gitignore
+.dockerignore
+Dockerfile
+docker-compose*.yml
+README.md
+
+# Python cache & build files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Local data & environment
+.env
+.env.*
+media/
+*.log
