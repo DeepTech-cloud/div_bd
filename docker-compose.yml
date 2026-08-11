@@ -7,11 +7,24 @@ services:
       - "8000:8000"
     volumes:
       - .:/app
-      - media_data:/app/media
     environment:
-      - UPLOAD_DIR=media
       - BASE_URL=${BASE_URL:-http://localhost:8000}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - DATABASE_URL=postgresql://postgres:postgrespassword@db:5432/divineai
+    depends_on:
+      - db
+
+  db:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_DB: divineai
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
 
 volumes:
-  media_data:
+  postgres_data:

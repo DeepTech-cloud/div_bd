@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "media"          # local folder for uploaded/generated images
     BASE_URL: str = "http://localhost:8000"  # used to build public image URLs
     GEMINI_API_KEY: Optional[str] = None
+    DATABASE_URL: str = "postgresql://postgres:postgrespassword@localhost:5432/divineai"
 
     model_config = SettingsConfigDict(case_sensitive=True, env_file=".env")
 
