@@ -12,7 +12,13 @@ app = FastAPI(
 
 @app.on_event("startup")
 def startup_event():
-    init_db()
+    import logging
+    logger = logging.getLogger("uvicorn.error")
+    try:
+        init_db()
+    except Exception as e:
+        logger.critical(f"Database initialization failed: {e}. FastAPI starting up anyway to prevent container crash.")
+
 
 # Set all CORS enabled origins
 app.add_middleware(
