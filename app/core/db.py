@@ -6,7 +6,12 @@ from app.core.config import settings
 
 logger = logging.getLogger("uvicorn.error")
 
-engine = create_engine(settings.DATABASE_URL)
+try:
+    engine = create_engine(settings.get_database_url)
+except Exception as e:
+    logger.critical(f"Failed to create database engine: {e}. Falling back to in-memory sqlite to prevent container startup crash.")
+    engine = create_engine("sqlite:///:memory:")
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
