@@ -1,9 +1,11 @@
 import base64
+import logging
 from fastapi import APIRouter, Request, HTTPException
 from app.services.image_processor import ImageProcessor
 from app.storage.firebase_storage import save_image
 from app.schemas.image import UploadResponse
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 IMAGE_MAGIC_BYTES = (
@@ -34,6 +36,7 @@ async def upload_image_endpoint(request: Request):
     """
     contents: bytes | None = None
     content_type = request.headers.get("content-type", "").lower()
+    logger.info(f"Upload request received | content-type={content_type!r}")
 
     # --- 1. Multipart Form Data (any key name) ---
     if "multipart/form-data" in content_type:
@@ -45,6 +48,7 @@ async def upload_image_endpoint(request: Request):
                     raw = await val.read()
                     if raw:
                         contents = raw
+                        logger.debug(f"Multipart: extracted {len(raw)} bytes from file field")
                         break
                 elif isinstance(val, str):
                     b64_part = val.split(",", 1)[1] if "," in val else val
@@ -52,10 +56,12 @@ async def upload_image_endpoint(request: Request):
                         decoded = base64.b64decode(b64_part)
                         if _is_image_bytes(decoded):
                             contents = decoded
+                            logger.debug(f"Multipart: extracted {len(decoded)} bytes from base64 field")
                             break
                     except Exception:
                         pass
         except Exception as e:
+            logger.warning(f"Failed to parse multipart form: {e}")
             raise HTTPException(status_code=422, detail=f"Failed to parse multipart form: {e}")
 
     # --- 2. JSON Payload (base64 string) ---
@@ -68,6 +74,7 @@ async def upload_image_endpoint(request: Request):
                     if isinstance(val, str) and val:
                         b64_part = val.split(",", 1)[1] if "," in val else val
                         contents = base64.b64decode(b64_part)
+                        logger.debug(f"JSON: extracted {len(contents)} bytes from field '{key}'")
                         break
                 if not contents:
                     for val in body.values():
@@ -77,10 +84,12 @@ async def upload_image_endpoint(request: Request):
                                 decoded = base64.b64decode(b64_part)
                                 if _is_image_bytes(decoded):
                                     contents = decoded
+                                    logger.debug(f"JSON: extracted {len(decoded)} bytes from fallback field")
                                     break
                             except Exception:
                                 pass
         except Exception as e:
+            logger.warning(f"Invalid JSON body: {e}")
             raise HTTPException(status_code=422, detail=f"Invalid JSON body: {e}")
 
     # --- 3. Raw Binary Payload or Fallback ---
@@ -88,8 +97,10 @@ async def upload_image_endpoint(request: Request):
         raw_body = await request.body()
         if raw_body and _is_image_bytes(raw_body):
             contents = raw_body
+            logger.debug(f"Raw binary: extracted {len(raw_body)} bytes")
 
     if not contents:
+        logger.warning("Upload rejected: no image bytes found in request")
         raise HTTPException(
             status_code=422,
             detail=(
@@ -100,18 +111,23 @@ async def upload_image_endpoint(request: Request):
             )
         )
 
+    logger.info(f"Image bytes received: {len(contents)} bytes — starting processing")
     try:
         # Process Image in thread pool (denoising, resizing, face cascade)
         processed_bytes = await ImageProcessor.process_async(contents)
+        logger.info(f"Image processing complete: {len(processed_bytes)} bytes")
 
         # Save to Firebase Storage
         upload_result = save_image(processed_bytes, subfolder="uploads", ext="jpg")
+        logger.info(f"Image saved to Firebase | image_id={upload_result['public_id']} | url={upload_result['secure_url']}")
 
         return UploadResponse(
             image_id=upload_result["public_id"],
             image_url=upload_result["secure_url"]
         )
     except ValueError as e:
+        logger.warning(f"Image validation failed: {e}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        logger.error(f"Upload processing failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Upload processing failed: {e}")

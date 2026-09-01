@@ -1,10 +1,10 @@
 import asyncio
+import logging
 import cv2
 import numpy as np
-from io import BytesIO
-from PIL import Image
 from concurrent.futures import ThreadPoolExecutor
 
+logger = logging.getLogger(__name__)
 _executor = ThreadPoolExecutor(max_workers=4)
 
 
@@ -21,23 +21,32 @@ class ImageProcessor:
                 _executor, ImageProcessor.process, image_bytes
             )
         """
+        logger.info(f"Processing image | input_size={len(image_bytes)} bytes")
+
         # 1. Load image
         np_arr = np.frombuffer(image_bytes, np.uint8)
         img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
         if img is None:
+            logger.warning("Failed to decode image bytes")
             raise ValueError("Invalid image")
+        logger.debug(f"Image decoded | shape={img.shape}")
 
         # 2. Noise Reduction (FastNlMeansDenoising — CPU-intensive)
+        logger.debug("Applying noise reduction (fastNlMeansDenoisingColored)...")
         img = cv2.fastNlMeansDenoisingColored(img, None, 10, 10, 7, 21)
+        logger.debug("Noise reduction complete")
 
         # 3. Face Detection (Simple Haar Cascade check)
+        logger.debug("Running face detection...")
         face_cascade = cv2.CascadeClassifier(
             cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
         )
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         faces = face_cascade.detectMultiScale(gray, 1.1, 4)
         if len(faces) == 0:
-            pass  # We could raise an error here if faces are strictly required
+            logger.warning("No face detected in image")
+            raise ValueError("No face detected in the image. Please upload a clear photo with a visible face.")
+        logger.info(f"Face detection passed | faces_found={len(faces)}")
 
         # 4. Resize if too large (Max width 1920)
         max_width = 1920
@@ -46,15 +55,19 @@ class ImageProcessor:
             ratio = max_width / width
             new_dim = (max_width, int(height * ratio))
             img = cv2.resize(img, new_dim, interpolation=cv2.INTER_AREA)
+            logger.debug(f"Image resized | original={width}x{height} -> {new_dim[0]}x{new_dim[1]}")
 
         # 5. Compress and return JPEG bytes (always JPEG regardless of input format)
         is_success, buffer = cv2.imencode(
             ".jpg", img, [int(cv2.IMWRITE_JPEG_QUALITY), 85]
         )
         if not is_success:
+            logger.error("Failed to encode image to JPEG")
             raise ValueError("Failed to encode image")
 
-        return buffer.tobytes()
+        result = buffer.tobytes()
+        logger.info(f"Image processing complete | output_size={len(result)} bytes")
+        return result
 
     @staticmethod
     async def process_async(image_bytes: bytes) -> bytes:

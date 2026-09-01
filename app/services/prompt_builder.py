@@ -1,4 +1,7 @@
 from datetime import datetime
+from zoneinfo import ZoneInfo
+
+IST = ZoneInfo("Asia/Kolkata")
 
 class PromptBuilder:
     # Default prompts matching user requirements
@@ -31,7 +34,7 @@ class PromptBuilder:
     
     @staticmethod
     def get_today_prompt() -> str:
-        today_idx = datetime.now().weekday()
+        today_idx = datetime.now(IST).weekday()
         base = PromptBuilder.DEFAULT_PROMPTS[today_idx]["base_prompt"]
         
         ai_prompt = f"""

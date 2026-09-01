@@ -30,7 +30,8 @@ FROM python:3.12-slim AS runtime
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PATH="/opt/venv/bin:$PATH"
+    PATH="/opt/venv/bin:$PATH" \
+    TZ=Asia/Kolkata
 
 WORKDIR /app
 
@@ -42,7 +43,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxrender-dev \
     libpq5 \
     libgl1 \
-    libgl1-mesa-glx \
+    tzdata \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy installed python dependencies from builder
