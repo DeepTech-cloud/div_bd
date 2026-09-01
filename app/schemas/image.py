@@ -11,6 +11,7 @@ class UploadResponse(BaseModel):
 class GenerateRequest(BaseModel):
     """Request body for the generate endpoint."""
     image_id: str
+    prompt: Optional[str] = None
 
 class GenerateResponse(BaseModel):
     """Returned after synchronous image generation."""

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from app.storage.local_storage import delete_image
+from app.storage.firebase_storage import delete_image
 
 router = APIRouter()
 

@@ -2,8 +2,7 @@ from fastapi import FastAPI, Response, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.routers import api_router
-from app.core.db import init_db, SessionLocal
-from app.core.models import Image
+from app.core.firebase import init_firebase
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -15,9 +14,9 @@ def startup_event():
     import logging
     logger = logging.getLogger("uvicorn.error")
     try:
-        init_db()
+        init_firebase()
     except Exception as e:
-        logger.critical(f"Database initialization failed: {e}. FastAPI starting up anyway to prevent container crash.")
+        logger.critical(f"Firebase initialization failed: {e}. FastAPI starting up anyway to prevent container crash.")
 
 
 # Set all CORS enabled origins
@@ -31,8 +30,6 @@ app.add_middleware(
 
 
 
-def health_check():
-    return {"status": "health check passed"}
 
 @app.get("/health")
 def health_check():
@@ -40,15 +37,5 @@ def health_check():
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
-# Serve stored images from PostgreSQL at /static/<path>
-@app.get("/static/{image_id:path}")
-def serve_image(image_id: str):
-    db = SessionLocal()
-    try:
-        db_image = db.query(Image).filter(Image.id == image_id).first()
-        if not db_image:
-            raise HTTPException(status_code=404, detail="Image not found")
-        return Response(content=db_image.content, media_type=db_image.content_type)
-    finally:
-        db.close()
+
 

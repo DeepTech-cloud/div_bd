@@ -1,14 +1,25 @@
+import asyncio
 import cv2
 import numpy as np
 from io import BytesIO
 from PIL import Image
+from concurrent.futures import ThreadPoolExecutor
+
+_executor = ThreadPoolExecutor(max_workers=4)
+
 
 class ImageProcessor:
     @staticmethod
     def process(image_bytes: bytes) -> bytes:
         """
-        Processes the image: Compress, Resize, Face Detection check, 
+        Processes the image: Compress, Resize, Face Detection check,
         Orientation Fix, Noise Reduction.
+
+        NOTE: cv2.fastNlMeansDenoisingColored is CPU-intensive (5–30s).
+        Run this in a thread pool if calling from an async context:
+            await asyncio.get_event_loop().run_in_executor(
+                _executor, ImageProcessor.process, image_bytes
+            )
         """
         # 1. Load image
         np_arr = np.frombuffer(image_bytes, np.uint8)
@@ -16,15 +27,17 @@ class ImageProcessor:
         if img is None:
             raise ValueError("Invalid image")
 
-        # 2. Noise Reduction (FastNlMeansDenoising)
+        # 2. Noise Reduction (FastNlMeansDenoising — CPU-intensive)
         img = cv2.fastNlMeansDenoisingColored(img, None, 10, 10, 7, 21)
 
         # 3. Face Detection (Simple Haar Cascade check)
-        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        face_cascade = cv2.CascadeClassifier(
+            cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+        )
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         faces = face_cascade.detectMultiScale(gray, 1.1, 4)
         if len(faces) == 0:
-            pass # We could raise an error here if faces are strictly required
+            pass  # We could raise an error here if faces are strictly required
 
         # 4. Resize if too large (Max width 1920)
         max_width = 1920
@@ -34,9 +47,17 @@ class ImageProcessor:
             new_dim = (max_width, int(height * ratio))
             img = cv2.resize(img, new_dim, interpolation=cv2.INTER_AREA)
 
-        # 5. Compress and return bytes
-        is_success, buffer = cv2.imencode(".jpg", img, [int(cv2.IMWRITE_JPEG_QUALITY), 85])
+        # 5. Compress and return JPEG bytes (always JPEG regardless of input format)
+        is_success, buffer = cv2.imencode(
+            ".jpg", img, [int(cv2.IMWRITE_JPEG_QUALITY), 85]
+        )
         if not is_success:
             raise ValueError("Failed to encode image")
-            
+
         return buffer.tobytes()
+
+    @staticmethod
+    async def process_async(image_bytes: bytes) -> bytes:
+        """Async wrapper — runs the blocking process() in a thread pool."""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(_executor, ImageProcessor.process, image_bytes)
