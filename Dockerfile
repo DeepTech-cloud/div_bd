@@ -44,7 +44,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     libgl1 \
     tzdata \
+    wget \
     && rm -rf /var/lib/apt/lists/*
+
+# Download Haar cascade XML to a fixed path (independent of OpenCV version)
+RUN mkdir -p /opt/opencv_data && \
+    wget -q -O /opt/opencv_data/haarcascade_frontalface_default.xml \
+    https://raw.githubusercontent.com/opencv/opencv/4.x/data/haarcascades/haarcascade_frontalface_default.xml
+
+ENV HAAR_CASCADE_PATH=/opt/opencv_data/haarcascade_frontalface_default.xml
 
 # Copy installed python dependencies from builder
 COPY --from=builder /opt/venv /opt/venv

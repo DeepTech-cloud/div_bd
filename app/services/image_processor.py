@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import cv2
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
@@ -38,9 +39,17 @@ class ImageProcessor:
 
         # 3. Face Detection (Simple Haar Cascade check)
         logger.debug("Running face detection...")
-        face_cascade = cv2.CascadeClassifier(
-            cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+        cascade_path = os.environ.get(
+            "HAAR_CASCADE_PATH",
+            cv2.data.haarcascades + "haarcascade_frontalface_default.xml",
         )
+        face_cascade = cv2.CascadeClassifier(cascade_path)
+        if face_cascade.empty():
+            logger.error(f"Failed to load Haar cascade from: {cascade_path}")
+            raise RuntimeError(
+                f"Face detection model not found at '{cascade_path}'. "
+                "Ensure HAAR_CASCADE_PATH is set correctly in the container."
+            )
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         faces = face_cascade.detectMultiScale(gray, 1.1, 4)
         if len(faces) == 0:
